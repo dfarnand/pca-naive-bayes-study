@@ -1,0 +1,230 @@
+---
+title: "Examining the use of Principle Component Analysis for Naive Bayes Classification"
+author: "Daniel Farnand"
+output: github_document
+---
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE, output=FALSE, cache=TRUE}
+library(tidyverse)
+library(ggthemr)
+library(ggrepel)
+library(here)
+
+# Run the script with no output
+suppressMessages(source(here("src/pca_nb.R")))
+
+results_tab <- results_df %>%
+  mutate(across(c(Orig, PCA, Diff, Entropy, KMO), as.numeric))
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+```
+
+# Introduction
+
+**Naive Bayes (NB) Classification** is an approach frequently used on a variety of classification problems. By assuming independence of each of the features (conditional on class), the overall conditional probability of features given class membership can be simplified to the product of individual univariate probabilities. Although real data can seldom be considered to be truly independent, the assumption allows an efficient approximation of the true multivariate density that often yields surprisingly accurate results. s
+
+**Principle Component Analysis (PCA)** is a type of data transformation for multivariate data that "rotates" the axes to maximize the variance shown on each successive dimension. The provides an alternative feature space where the features are ordered by decreasing variance. This can be used for reducing dimensionality of data by keeping a limited number of components, and in general PCA has a variety of applications in data modeling, analysis, and visualization. Its also also been shown to increase the accuracy of Naïve Bayes Classification with specific datasets[^1].
+
+[^1]: See further discussion of PCA and Gopal et al.
+
+This claim leads us to the central question of this study. If PCA really provides a substantial improvement to NB, then it should be recommended in every case. However it is not clear how consistent the effect is across different datasets, nor how much improvement in the classification accuracy can really be expected. This paper discusses what is currently known about Principal Component Analysis with Naive Bayes Classification and shows the preliminary results of a study using a varety of classification datasets. Impressions from the results of this study can inform more in-depth research.
+
+# Naive Bayes Classification
+
+Naive Bayes is an application of Bayes' Theorem to data classification where Event A is defined as a given point's label (or group membership), while Event B is the set of features that define any given point (so $B=\{X_1,X_2,...,X_p\}$ where the data contains $p$ features). Therefore each point has a conditional probability of group membership:
+
+$$P(A_i|X_{1_i},X_{2_i},...,X_{p_i}) \text{ Where i=1,2,...,N for N observations}$$
+
+Application of Bayes' formula will give the following equation:
+
+$$P(A_i|X_{1_i},X_{2_i},...,X_{p_i}) = \frac{P(X_{1_i},X_{2_i},...,X_{p_i}|A_i) P(A)}{P(X_{1_i},X_{2_i},...,X_{p_i})}$$
+
+The denominator is constant for any given data, but the prior probabilities $P(A)$ and $P(X_{1_i},X_{2_i},...,X_{p_i}|A_i)$ must be estimated. The critical step (and what makes this Bayesian classifier "naive") is assuming that features are independent within each class. Therefore we can simplify this conditional multivariate probability as the product of univariate conditional probabilities:
+
+$$P(X_{1_i},X_{2_i},...,X_{p_i}|A_i) = \prod\limits_{k=1}^p P(X_k|A)$$
+
+Therefore the equation can be revised as:
+
+$$P(A_i|X_{1_i},X_{2_i},...,X_{p_i}) = \frac{\left(\prod\limits_{k=1}^p P(X_k|A) \right) P(A)}{P(X_{1_i},X_{2_i},...,X_{p_i})}$$
+
+For this analysis we used the implementation of NB in the `e1071` R package. (Meyer)
+
+## Principle Component Analysis
+
+The use of principal component analysis allows multidimensional data to be represented in fewer dimensions by prioritizing the variation captured in each dimension. This is normally helpful to visualize data (as we can easily display two or three dimensional data, but four or more dimensions becomes more difficult), but it has also incidentally been found to improve Naive Bayes Classification.
+
+Principal components are linear combinations of features that maximize the variance of the data at each level. Thus the first principle component will always have the highest variation, the second will have the second highest, and so on. By definition all principal components will be orthogonal as well. In R the `princomp` function provides principal component analysis.
+
+The use of PCA in Naive Bayes has been explored in a few studies. Gupta (2004) demonstrated this with optical character recognition datasets. This study found that with small datasets (defined as having observations numbered in the hundreds) using principle components greatly increased the accuracy of the classification. When large datasets (observations in the thousands) were used, such improvements were not seen.Fan and Poh (2007) conducted a related analysis that demonstrated various methods to increase Naive Bayes accuracy. Their analysis showed slight improvements when using PCA across all datasets tested.
+
+## Choice of Data
+
+In order to best observe the performance of Naive Bayes in a variety of conditions, datasets were chosen to display diverse characteristics, including numbers of features, classes, and observations. Features include discrete and continuous numerical data. All datasets also have a finite and known set of mutually exclusive classes.
+
+The following datasets were used. Specific details regarding the source of data and implications of results are not discussed here as only the details related to the comparative results of Naive Bayes with and without PCA are considered relevant.
+
+|                                                  |                |
+|--------------------------------------------------|:---------------|
+| **Dataset**                                      | **Citation**   |
+| Fundamental Clustering Problems Suite            | Ultsch 2005    |
+| Morphological Measurements on Leptograpsus Crabs | Cambell 1974   |
+| Edgar Anderson's Iris Data                       | Fisher 1936    |
+| Wine recognition data                            | Forina         |
+| Spam Email Database                              | Hopkins 1999   |
+| Climate Model Simulation Crashes                 | Lucas          |
+| Blood Transfusion Service Center                 | Yeh 2008       |
+| Indian Liver Patients Dataset                    | Ramana 2012    |
+| Daphnet Freezing of Gait Dataset                 | Bächlin 2010   |
+| Seismic Bumps Dataset                            | Wrobel 2010    |
+| Glass Identification Database                    | German 1987    |
+| Wisconsin Breast Cancer Database                 | Wolberg        |
+| Connectionist Bench (Sonar, Mines vs. Rocks)     | Gorman 1988    |
+| Pima Indians Diabetes Data Set                   | Smith 1988     |
+| Ionosphere Data Set                              | Sigillito 1989 |
+| Vehicle Silhouettes                              | Siebert 1987   |
+| Yeast Dataset                                    | Yeast          |
+
+## Procedure
+
+In order to process the datasets under standard conditions, R code was written that calculated the Principle Components for a given dataset, then tested both in 90/10 folding cross-validation, returning the results as a array along with other details of the data and related calculations. This information is tabulated as follows:
+
+```{r}
+results_tab %>%
+  select(Dataset = dataset, 
+         Orig, 
+         PCA, 
+         Diff, 
+         NFeatures, 
+         NGroups, 
+         NObs, 
+         Entropy, 
+         MSA = KMO) %>%
+  mutate(across(c(Orig, PCA, Diff, Entropy, MSA), round, digits = 3)) %>%
+  knitr::kable()
+```
+
+## Discussion of Results
+
+The first impression from the resulting data is that PCA does not lead to a consistent change in the accuracy of Naive Bayes. The amount the accuracy changed tends to be close to 0 (either positive or negative). There are only three datasets for which we see significant improvement: Crabs, Glass, and Vehicle.
+
+```{r}
+results_tab %>%
+  ggplot(aes(y = Diff, x = "", label=dataset)) +
+  geom_boxplot(coef=100) +
+  geom_jitter(aes(color=dataset), height=0, width=0.2) +
+  labs(x = "", 
+       y = "Percentage Point Difference (PCA-Orig)",
+       color = "Dataset",
+       title = "Classification Accuracy Improvement by Dataset")
+```
+
+A pattern shown by this data is that for datasets in which Naive Bayes does a very good job at classifying (over 90% correct in the cross-validation), PCA tended not to perform as well. Other variation in the results could be a result of the specific shape and nature of the data. We can see this by looking at the plot of the results of the cross validation of Naive Bayes with the original data versus the amount it changed when the PCA procedure was introduced.
+
+```{r}
+results_tab %>%
+  ggplot(aes(x = Diff, y = Orig, label = dataset)) +
+  geom_vline(xintercept = 0, linetype="dashed", alpha = 0.5) + 
+  geom_point() +
+  geom_text_repel() +
+  labs(x = "Change with PCA", 
+     y = "Accuracy of NB with Original Data",
+     title = "Amount of PCA Improvement vs Accuracy of NB with Original Data") 
+```
+
+One intuitive explanation of why PCA is very helpful in certain cases, and not in others may be to think about the assumption that Naive Bayes is built on, that each feature conditional on class membership is independent of the others. Data that does not follow this assumption is less likely to be accurately classified by the NB process. However one of the results of PCA is that it removes the inter-correlation of the variables. In these cases of highly correlated data results with PCA could prove much more accurate. This is especially evident in the Crabs dataset, for which PCA provided a very large improvement in accuracy. In the opposite case, however, Naive Bayes classification of highly *un*correlated data couldn't improve beyond what had already been accomplished with the original data, and moreso due to small alterations that occur due to the PCA it might decrease.
+
+In order to test this idea, we require a method to quantify the inter-feature correlation conditional on each class. However finding a single statistic that can be applied to such a variety of datasets for comparison has proven difficult to obtain.<!--# TODO: Look into a variant of box's test--> One proposed method was to calculate the entropy of the correlation matrix's eigenvalues, however when plotted against the change in accuracy associated with PCA, there was no correlation between entropy and whether PCA caused a positive or negative change in test results.
+
+```{r}
+results_tab %>%
+  ggplot(aes(x = Entropy, y = Diff, label = dataset)) +
+  geom_point() +
+  geom_smooth(aes(color = "Regression Line"), method = 'lm', se = FALSE)+
+  geom_text_repel() +
+  labs(title = "Entropy vs PCA Improvement",
+       y = "PCA Diff", 
+       color = "")
+  
+```
+
+```{r}
+summary(lm(Diff ~ Entropy, data = results_tab))
+```
+
+We can see both visually and with the regression that there's most likely no relationship here.
+
+Another option was the measure of sampling adequacy (MSA), used in factor analysis.
+
+```{r}
+results_tab %>%
+  ggplot(aes(x = KMO, y = Diff, label = dataset)) +
+  geom_point() +
+  geom_smooth(aes(color = "Regression Line"), method = 'lm', se = FALSE)+
+  geom_text_repel() +
+  labs(title = "MSA vs PCA Improvement",
+       x = "Measure of Sampling Adequacy",
+       y = "PCA Diff", 
+       color = "")
+```
+
+```{r}
+summary(lm(Diff ~ KMO, data = results_tab))
+```
+
+We do see a correlation here, which may make this a good point to start further investigations. Other measures from the area of signal processing may provide a more adequate solution to this problem.
+
+The Pima Diabetes and the Yeast datasets also stood out by going against the trend, as results were not highly accurate with untransformed data, but nonetheless displayed small drops in the accuracy when PCA is applied. Further examination of this data might provide a better understanding of the phenomenon in general.
+
+## Conclusion
+
+Based on the results of this exploration, Principle Components Analysis would be recommended for classification problems that showed initially poor results using the Naive Bayes Classifier. Therefore the recommendation would always be to attempt NB on the original data first, and then redo depending on the results. This type of trial and error work is obviously not the sort of deterministic answer that could be hoped for, so further work in understanding the interaction between PCA and Naive Bayes and finding better ways to quantify the inter-feature correlation within each class may provide a more concrete insight.
+
+## References
+
+Fan, Liwei, and Kim Leng Poh. “A Comparative Study of PCA, ICA and Class-Conditional ICA for Naive Bayes Classifier.” In Computational and Ambient Intelligence, 16–22. Springer, Berlin, Heidelberg, 2007. <http://link.springer.com/chapter/10.1007/978-3-540-73007-1_3>.
+
+Gupta, Gopal Krishna. “Principal Component Analysis and Bayesian Classifier Based Character Recognition.” AIP Conference Proceedings 707, no. 1 (April 21, 2004): 465–79. <doi:10.1063/1.1751388>.
+
+Meyer, D., Dimitriadou, E., Hornik, K., Weingessel, A., Leisch, F., Chang, C., Lin, C., e1071 Library.
+
+Weihs, C., Ligges, U., Luebke, K. and Raabe, N. (2005). klaR Analyzing German Business Cycles. In Baier, D., Decker, R. and Schmidt-Thieme, L. (eds.). Data Analysis and Decision Support, 335-343, Springer-Verlag, Berlin.
+
+## Dataset Citations
+
+Lichman, M. (2013). UCI Machine Learning Repository [<http://archive.ics.uci.edu/ml>]. Irvine, CA: University of California, School of Information and Computer Science.
+
+Ultsch, A. "Clustering with SOM: U\*C", In Proc. Workshop on Self-Organizing Maps, Paris, France, 2005, pp. 75-82
+
+*The following datasets were obtained via the UCI Machine Learning Repository.*
+
+Bächlin, M., Plotnik, M., Roggen, D., Maidan, I., Hausdorff, J., M., Giladi, N.n and Tröster, G., "Wearable Assistant for Parkinson's Disease Patients With the Freezing of Gait Symptom."" IEEE Transactions on Information Technology in Biomedicine, 14(2), March 2010, pages 436-446
+
+Campbell, N.A. and Mahon, R.J. A multivariate study of variation in two species of rock crab of genus Leptograpsus. Australian Journal of Zoology 22, 1974, 417–425.
+
+Fisher, R. A."The use of multiple measurements in taxonomic problems," 1936, Annals of Eugenics, 7, Part II, 179–188, The data were collected by Anderson, Edgar "The irises of the Gaspe Peninsula", 1935, Bulletin of the American Iris Society, 59, 2–5.
+
+Forina, M. et al, "PARVUS - An Extendible Package for Data Exploration, Classification and Correlation," Institute of Pharmaceutical and Food Analysis and Technologies, Via Brigata Salerno, 16147 Genoa, Italy. Data colleted by Stefan Aeberhard, July 1991 Updated Sept 21, 1998 by C.Blake.
+
+German, B., "Glass Identification Database," Central Research Establishment Home Office Forensic Science Service Aldermaston, 1987, Reading, Berkshire RG7 4PN
+
+Gorman, R. P., and Sejnowski, T. J., "Analysis of Hidden Units in a Layered Network Trained to Classify Sonar Targets," 1988, in Neural Networks, Vol. 1, pp. 75-89.
+
+Hopkins, M., Reeber E., Forman, G., "Spam Email Database," Jaap Suermondt Hewlett-Packard Labs, 1999.
+
+Lucas, D. D., Klein, R., Tannahill, J., Ivanova, D., Brandon, S., Domyancic, D., and Zhang, Y., "Failure analysis of parameter-induced simulation crashes in climate models", Geosci. Model Dev. Discuss., 6, 585-623,
+
+Ramana, Bendi Venkata, Prof. M. S. Prasad Babu and Prof. N. B. Venkateswarlu, A Critical Comparative Study of Liver Patients from USA and INDIA: An Exploratory Analysis, International Journal of Computer Science Issues, ISSN :1694-0784, May 2012.
+
+Siebert, J.P., "Vehicle Recognition Using Rule Based Methods," 1987, Turing Institute Research Memorandum TIRM-87-018.
+
+Sigillito, V. G., Wing, S. P., Hutton, L. V., & Baker, K. B, "Classification of radar returns from the ionosphere using neural networks," 1989, Johns Hopkins APL Technical Digest, 10, 262-266.
+
+Sikora M., Wrobel L.: Application of rule induction algorithms for analysis of data collected by seismic hazard monitoring systems in coal mines. Archives of Mining Sciences, 55(1), 2010, 91-114.
+
+Smith, J.W., Everhart, J.E., Dickson, W.C., Knowler, W.C., & Johannes, R.S., "Using the ADAP learning algorithm to forecast the onset of diabetes mellitus," 198, In Proceedings of the Symposium on Computer Applications and Medical Care, IEEE Computer Society Press, pp. 261--265.
+
+Wolberg, W.H., "Seismic Bumps Dataset," 2010, General Surgery Dept. University of Wisconsin, Clinical Sciences Center Madison, WI 53792.
+
+"Yeast Dataset," Kenta Nakai Institue of Molecular and Cellular Biology Osaka, University 1-3 Yamada-oka, Suita 565 Japan.
+
+Yeh, I-Cheng, Yang, King-Jang, and Ting, Tao-Ming, "Knowledge discovery on RFM model using Bernoulli sequence, "Expert Systems with Applications, 2008 (<doi:10.1016/j.eswa.2008.07.018>).
