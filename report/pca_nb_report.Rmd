@@ -4,7 +4,7 @@ author: "Daniel Farnand"
 output: github_document
 ---
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE, output=FALSE, cache=TRUE}
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE, output=FALSE, cache=FALSE}
 library(tidyverse)
 library(ggthemr)
 library(ggrepel)
@@ -16,7 +16,7 @@ suppressMessages(source(here("src/pca_nb.R")))
 results_tab <- results_df %>%
   mutate(across(c(Orig, PCA, Diff, Entropy, KMO), as.numeric))
 
-knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```
 
 # Introduction
@@ -90,15 +90,17 @@ In order to process the datasets under standard conditions, R code was written t
 
 ```{r}
 results_tab %>%
-  select(Dataset = dataset, 
-         Orig, 
-         PCA, 
-         Diff, 
-         NFeatures, 
-         NGroups, 
-         NObs, 
-         Entropy, 
-         MSA = KMO) %>%
+  select(
+    Dataset = dataset,
+    Orig,
+    PCA,
+    Diff,
+    NFeatures,
+    NGroups,
+    NObs,
+    Entropy,
+    MSA = KMO
+  ) %>%
   mutate(across(c(Orig, PCA, Diff, Entropy, MSA), round, digits = 3)) %>%
   knitr::kable()
 ```
@@ -109,13 +111,15 @@ The first impression from the resulting data is that PCA does not lead to a cons
 
 ```{r}
 results_tab %>%
-  ggplot(aes(y = Diff, x = "", label=dataset)) +
-  geom_boxplot(coef=100) +
-  geom_jitter(aes(color=dataset), height=0, width=0.2) +
-  labs(x = "", 
-       y = "Percentage Point Difference (PCA-Orig)",
-       color = "Dataset",
-       title = "Classification Accuracy Improvement by Dataset")
+  ggplot(aes(y = Diff, x = "", label = dataset)) +
+  geom_boxplot(coef = 100) +
+  geom_jitter(aes(color = dataset), height = 0, width = 0.2) +
+  labs(
+    x = "",
+    y = "Percentage Point Difference (PCA-Orig)",
+    color = "Dataset",
+    title = "Classification Accuracy Improvement by Dataset"
+  )
 ```
 
 A pattern shown by this data is that for datasets in which Naive Bayes does a very good job at classifying (over 90% correct in the cross-validation), PCA tended not to perform as well. Other variation in the results could be a result of the specific shape and nature of the data. We can see this by looking at the plot of the results of the cross validation of Naive Bayes with the original data versus the amount it changed when the PCA procedure was introduced.
@@ -123,12 +127,14 @@ A pattern shown by this data is that for datasets in which Naive Bayes does a ve
 ```{r}
 results_tab %>%
   ggplot(aes(x = Diff, y = Orig, label = dataset)) +
-  geom_vline(xintercept = 0, linetype="dashed", alpha = 0.5) + 
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
   geom_point() +
   geom_text_repel() +
-  labs(x = "Change with PCA", 
-     y = "Accuracy of NB with Original Data",
-     title = "Amount of PCA Improvement vs Accuracy of NB with Original Data") 
+  labs(
+    x = "Change with PCA",
+    y = "Accuracy of NB with Original Data",
+    title = "Amount of PCA Improvement vs Accuracy of NB with Original Data"
+  )
 ```
 
 One intuitive explanation of why PCA is very helpful in certain cases, and not in others may be to think about the assumption that Naive Bayes is built on, that each feature conditional on class membership is independent of the others. Data that does not follow this assumption is less likely to be accurately classified by the NB process. However one of the results of PCA is that it removes the inter-correlation of the variables. In these cases of highly correlated data results with PCA could prove much more accurate. This is especially evident in the Crabs dataset, for which PCA provided a very large improvement in accuracy. In the opposite case, however, Naive Bayes classification of highly *un*correlated data couldn't improve beyond what had already been accomplished with the original data, and moreso due to small alterations that occur due to the PCA it might decrease.
@@ -139,12 +145,13 @@ In order to test this idea, we require a method to quantify the inter-feature co
 results_tab %>%
   ggplot(aes(x = Entropy, y = Diff, label = dataset)) +
   geom_point() +
-  geom_smooth(aes(color = "Regression Line"), method = 'lm', se = FALSE)+
+  geom_smooth(aes(color = "Regression Line"), method = "lm", se = FALSE) +
   geom_text_repel() +
-  labs(title = "Entropy vs PCA Improvement",
-       y = "PCA Diff", 
-       color = "")
-  
+  labs(
+    title = "Entropy vs PCA Improvement",
+    y = "PCA Diff",
+    color = ""
+  )
 ```
 
 ```{r}
@@ -159,12 +166,14 @@ Another option was the measure of sampling adequacy (MSA), used in factor analys
 results_tab %>%
   ggplot(aes(x = KMO, y = Diff, label = dataset)) +
   geom_point() +
-  geom_smooth(aes(color = "Regression Line"), method = 'lm', se = FALSE)+
+  geom_smooth(aes(color = "Regression Line"), method = "lm", se = FALSE) +
   geom_text_repel() +
-  labs(title = "MSA vs PCA Improvement",
-       x = "Measure of Sampling Adequacy",
-       y = "PCA Diff", 
-       color = "")
+  labs(
+    title = "MSA vs PCA Improvement",
+    x = "Measure of Sampling Adequacy",
+    y = "PCA Diff",
+    color = ""
+  )
 ```
 
 ```{r}
